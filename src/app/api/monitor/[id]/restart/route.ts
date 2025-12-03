@@ -3,10 +3,11 @@ import { monitorService } from '@/lib/monitor-service';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idString } = await params;
+    const id = parseInt(idString);
     const success = await monitorService.restartMonitoring(id);
 
     if (success) {

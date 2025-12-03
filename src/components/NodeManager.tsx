@@ -20,7 +20,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Play, Square, RefreshCw, Server } from 'lucide-react';
+import { Plus, Trash2, Play, Square, RefreshCw, Server, Pencil } from 'lucide-react';
 
 interface Node {
   id: number;
@@ -36,6 +36,8 @@ interface Node {
 export function NodeManager() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingNodeId, setEditingNodeId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -78,6 +80,44 @@ export function NodeManager() {
       }
     } catch (error) {
       console.error('Failed to add node:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenEditDialog = (node: Node) => {
+    setEditingNodeId(node.id);
+    setFormData({
+      name: node.name,
+      ip: node.ip,
+      username: node.username,
+      password: node.password,
+      port: node.port.toString(),
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditNode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNodeId) return;
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/nodes/${editingNodeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        setIsEditDialogOpen(false);
+        setEditingNodeId(null);
+        setFormData({ name: '', ip: '', username: '', password: '', port: '8728' });
+        loadNodes();
+      }
+    } catch (error) {
+      console.error('Failed to edit node:', error);
     } finally {
       setLoading(false);
     }
@@ -181,16 +221,87 @@ export function NodeManager() {
                 />
               </div>
               <div>
-                <Label htmlFor="port">API Port</Label>
+                <Label htmlFor="port">API Port (MikroTik API, no Winbox)</Label>
                 <Input
                   id="port"
                   value={formData.port}
                   onChange={(e) => setFormData({ ...formData, port: e.target.value })}
                   placeholder="8728"
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Puerto API: 8728 (por defecto) - Diferente al puerto Winbox (8291)
+                </p>
               </div>
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Adding...' : 'Add Node'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit MikroTik Node</DialogTitle>
+              <DialogDescription>
+                Update the connection details for your MikroTik router
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleEditNode} className="space-y-4">
+              <div>
+                <Label htmlFor="edit-name">Node Name</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Main Router"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-ip">IP Address</Label>
+                <Input
+                  id="edit-ip"
+                  value={formData.ip}
+                  onChange={(e) => setFormData({ ...formData, ip: e.target.value })}
+                  placeholder="192.168.1.1"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-username">Username</Label>
+                <Input
+                  id="edit-username"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="admin"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-password">Password</Label>
+                <Input
+                  id="edit-password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-port">API Port (MikroTik API, no Winbox)</Label>
+                <Input
+                  id="edit-port"
+                  value={formData.port}
+                  onChange={(e) => setFormData({ ...formData, port: e.target.value })}
+                  placeholder="8728"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Puerto API: 8728 (por defecto) - Diferente al puerto Winbox (8291)
+                </p>
+              </div>
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? 'Updating...' : 'Update Node'}
               </Button>
             </form>
           </DialogContent>
@@ -213,7 +324,7 @@ export function NodeManager() {
               <CardDescription>{node.ip}:{node.port}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 {!node.isMonitoring ? (
                   <Button
                     size="sm"
@@ -241,12 +352,25 @@ export function NodeManager() {
                 >
                   <RefreshCw className="w-4 h-4" />
                 </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenEditDialog(node)}
+                  className="flex-1"
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
                 <Button
                   size="sm"
                   variant="destructive"
                   onClick={() => handleDeleteNode(node.id)}
+                  className="flex-1"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
                 </Button>
               </div>
             </CardContent>

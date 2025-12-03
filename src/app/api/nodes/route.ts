@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
       port: port || 8728
     });
 
-    // Auto-start monitoring
-    await monitorService.startMonitoring(Number(nodeId));
+    // Auto-start monitoring disabled - user can start manually
+    // await monitorService.startMonitoring(Number(nodeId));
 
     return NextResponse.json({ id: nodeId, message: 'Node created successfully' });
   } catch (error: any) {

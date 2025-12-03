@@ -9,8 +9,9 @@ export class MonitorService {
   private io: any = null;
 
   constructor() {
-    // Auto-start monitoring for existing nodes
-    this.initializeMonitors();
+    // Auto-start monitoring disabled to prevent automatic connections
+    // Uncomment the line below to enable auto-monitoring on startup
+    // this.initializeMonitors();
   }
 
   setSocketIO(io: any): void {
