@@ -7,6 +7,8 @@ export class MonitorService {
   private monitors: Map<number, MikrotikMonitor> = new Map();
   private detectors: Map<number, PatternDetector> = new Map();
   private io: any = null;
+  private connectionQueue: Array<{ nodeId: number; resolve: (value: boolean) => void }> = [];
+  private isConnecting = false;
 
   constructor() {
     // Auto-start monitoring disabled to prevent automatic connections
@@ -28,6 +30,37 @@ export class MonitorService {
   }
 
   async startMonitoring(nodeId: number): Promise<boolean> {
+    // Add to connection queue to ensure sequential connections
+    return new Promise((resolve) => {
+      this.connectionQueue.push({ nodeId, resolve });
+      this.processConnectionQueue();
+    });
+  }
+
+  private async processConnectionQueue(): Promise<void> {
+    if (this.isConnecting || this.connectionQueue.length === 0) {
+      return;
+    }
+
+    this.isConnecting = true;
+    const { nodeId, resolve } = this.connectionQueue.shift()!;
+
+    try {
+      const result = await this.connectNode(nodeId);
+      resolve(result);
+    } catch (error) {
+      console.error(`[Monitor] Error connecting node ${nodeId}:`, error);
+      resolve(false);
+    } finally {
+      this.isConnecting = false;
+      // Wait 2 seconds before processing next connection to avoid RADIUS issues
+      setTimeout(() => {
+        this.processConnectionQueue();
+      }, 2000);
+    }
+  }
+
+  private async connectNode(nodeId: number): Promise<boolean> {
     const node = nodeOperations.getById(nodeId);
     if (!node) {
       console.error(`[Monitor] Node ${nodeId} not found`);
@@ -36,6 +69,8 @@ export class MonitorService {
 
     // Stop existing monitor if any
     this.stopMonitoring(nodeId);
+
+    console.log(`[Monitor] Starting connection to node ${nodeId} (${node.name})`);
 
     const monitor = new MikrotikMonitor(node);
     const detector = new PatternDetector(nodeId);

@@ -9,12 +9,15 @@ export interface MikrotikLog {
 }
 
 export class MikrotikMonitor {
-  private client: RouterOSClient | null = null;
+  private api: RouterOSClient | null = null;
+  private client: any = null;
   private node: Node;
   private connected = false;
   private lastLogId: string | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private logCheckInterval: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 3;
 
   constructor(node: Node) {
     this.node = node;
@@ -22,23 +25,64 @@ export class MikrotikMonitor {
 
   async connect(): Promise<boolean> {
     try {
-      this.client = new RouterOSClient({
+      // Check if we're within monitoring hours
+      if (!this.isWithinMonitoringHours()) {
+        console.log(`[MikroTik] ${this.node.name} is outside monitoring hours`);
+        this.connected = false;
+        return false;
+      }
+
+      // Determine port based on auth method
+      let port = this.node.port || 8728;
+      const authMethod = this.node.auth_method || 'api';
+
+      if (!this.node.port) {
+        switch (authMethod) {
+          case 'api':
+            port = 8728;
+            break;
+          case 'web':
+            port = 80;
+            break;
+          case 'winbox':
+            port = 8291;
+            break;
+        }
+      }
+
+      this.api = new RouterOSClient({
         host: this.node.ip,
-        port: this.node.port || 8728,
+        port: port,
         user: this.node.username,
         password: this.node.password,
         timeout: 10000,
       });
 
-      await this.client.connect();
+      this.client = await this.api.connect();
       this.connected = true;
-      console.log(`[MikroTik] Connected to ${this.node.name} (${this.node.ip})`);
+      this.reconnectAttempts = 0; // Reset attempts on successful connection
+      console.log(`[MikroTik] Connected to ${this.node.name} (${this.node.ip}) via ${authMethod}`);
       return true;
     } catch (error) {
       console.error(`[MikroTik] Connection failed to ${this.node.name}:`, error);
       this.connected = false;
       this.scheduleReconnect();
       return false;
+    }
+  }
+
+  private isWithinMonitoringHours(): boolean {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const startHour = this.node.monitor_start_hour ?? 0;
+    const endHour = this.node.monitor_end_hour ?? 24;
+
+    if (startHour <= endHour) {
+      // Same day range (e.g., 8-17)
+      return currentHour >= startHour && currentHour < endHour;
+    } else {
+      // Overnight range (e.g., 22-6)
+      return currentHour >= startHour || currentHour < endHour;
     }
   }
 
@@ -51,12 +95,13 @@ export class MikrotikMonitor {
       clearInterval(this.logCheckInterval);
       this.logCheckInterval = null;
     }
-    if (this.client) {
+    if (this.api) {
       try {
-        await this.client.close();
+        await this.api.close();
       } catch (error) {
         console.error(`[MikroTik] Error closing connection to ${this.node.name}:`, error);
       }
+      this.api = null;
       this.client = null;
     }
     this.connected = false;
@@ -65,11 +110,24 @@ export class MikrotikMonitor {
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) return;
 
+    this.reconnectAttempts++;
+
+    if (this.reconnectAttempts > this.maxReconnectAttempts) {
+      console.log(`[MikroTik] Max reconnection attempts (${this.maxReconnectAttempts}) reached for ${this.node.name}. Stopping reconnection attempts.`);
+      return;
+    }
+
+    console.log(`[MikroTik] Scheduling reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} for ${this.node.name}`);
+
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectTimeout = null;
-      console.log(`[MikroTik] Attempting to reconnect to ${this.node.name}...`);
+      console.log(`[MikroTik] Attempting to reconnect to ${this.node.name}... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       this.connect();
     }, 30000); // Retry every 30 seconds
+  }
+
+  resetReconnectAttempts(): void {
+    this.reconnectAttempts = 0;
   }
 
   async getSystemLogs(limit = 50): Promise<MikrotikLog[]> {
@@ -78,7 +136,8 @@ export class MikrotikMonitor {
     }
 
     try {
-      const logs = await this.client.write('/log/print') as any[];
+      const menu = this.client.menu('/log');
+      const logs = await menu.getAll() as any[];
 
       return logs.slice(0, limit).map(log => ({
         '.id': log['.id'] || '',
@@ -100,7 +159,8 @@ export class MikrotikMonitor {
     }
 
     try {
-      const logs = await this.client.write('/log/print') as any[];
+      const menu = this.client.menu('/log');
+      const logs = await menu.getAll() as any[];
 
       // Filter logs after last known ID
       let newLogs = logs;
@@ -138,7 +198,8 @@ export class MikrotikMonitor {
     }
 
     try {
-      const interfaces = await this.client.write('/interface/print');
+      const menu = this.client.menu('/interface');
+      const interfaces = await menu.getAll();
       return interfaces as any[];
     } catch (error) {
       console.error(`[MikroTik] Error getting interfaces from ${this.node.name}:`, error);
@@ -152,7 +213,8 @@ export class MikrotikMonitor {
     }
 
     try {
-      const resources = await this.client.write('/system/resource/print') as any[];
+      const menu = this.client.menu('/system/resource');
+      const resources = await menu.getAll() as any[];
       return resources[0];
     } catch (error) {
       console.error(`[MikroTik] Error getting system resources from ${this.node.name}:`, error);

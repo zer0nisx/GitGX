@@ -13,6 +13,9 @@ db.exec(`
     username TEXT NOT NULL,
     password TEXT NOT NULL,
     port INTEGER DEFAULT 8728,
+    auth_method TEXT DEFAULT 'api',
+    monitor_start_hour INTEGER DEFAULT 0,
+    monitor_end_hour INTEGER DEFAULT 24,
     status TEXT DEFAULT 'disconnected',
     last_connected DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -56,6 +59,23 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_alerts_resolved ON alerts(resolved);
 `);
 
+// Add new columns if they don't exist (migrations)
+try {
+  db.exec(`ALTER TABLE nodes ADD COLUMN auth_method TEXT DEFAULT 'api'`);
+} catch (e) {
+  // Column already exists
+}
+try {
+  db.exec(`ALTER TABLE nodes ADD COLUMN monitor_start_hour INTEGER DEFAULT 0`);
+} catch (e) {
+  // Column already exists
+}
+try {
+  db.exec(`ALTER TABLE nodes ADD COLUMN monitor_end_hour INTEGER DEFAULT 24`);
+} catch (e) {
+  // Column already exists
+}
+
 export interface Node {
   id?: number;
   name: string;
@@ -63,6 +83,9 @@ export interface Node {
   username: string;
   password: string;
   port?: number;
+  auth_method?: 'api' | 'web' | 'winbox';
+  monitor_start_hour?: number;
+  monitor_end_hour?: number;
   status?: string;
   last_connected?: string;
   created_at?: string;

@@ -19,6 +19,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Play, Square, RefreshCw, Server, Pencil } from 'lucide-react';
 
@@ -29,6 +36,9 @@ interface Node {
   username: string;
   password: string;
   port: number;
+  auth_method: 'api' | 'web' | 'winbox';
+  monitor_start_hour: number;
+  monitor_end_hour: number;
   status: string;
   isMonitoring: boolean;
 }
@@ -46,6 +56,9 @@ export function NodeManager() {
     username: '',
     password: '',
     port: '8728',
+    auth_method: 'api' as 'api' | 'web' | 'winbox',
+    monitor_start_hour: '0',
+    monitor_end_hour: '24',
   });
 
   useEffect(() => {
@@ -75,7 +88,16 @@ export function NodeManager() {
 
       if (response.ok) {
         setIsAddDialogOpen(false);
-        setFormData({ name: '', ip: '', username: '', password: '', port: '8728' });
+        setFormData({
+          name: '',
+          ip: '',
+          username: '',
+          password: '',
+          port: '8728',
+          auth_method: 'api',
+          monitor_start_hour: '0',
+          monitor_end_hour: '24'
+        });
         loadNodes();
       }
     } catch (error) {
@@ -93,6 +115,9 @@ export function NodeManager() {
       username: node.username,
       password: node.password,
       port: node.port.toString(),
+      auth_method: node.auth_method || 'api',
+      monitor_start_hour: node.monitor_start_hour?.toString() || '0',
+      monitor_end_hour: node.monitor_end_hour?.toString() || '24',
     });
     setIsEditDialogOpen(true);
   };
@@ -113,7 +138,16 @@ export function NodeManager() {
       if (response.ok) {
         setIsEditDialogOpen(false);
         setEditingNodeId(null);
-        setFormData({ name: '', ip: '', username: '', password: '', port: '8728' });
+        setFormData({
+          name: '',
+          ip: '',
+          username: '',
+          password: '',
+          port: '8728',
+          auth_method: 'api',
+          monitor_start_hour: '0',
+          monitor_end_hour: '24'
+        });
         loadNodes();
       }
     } catch (error) {
@@ -221,17 +255,66 @@ export function NodeManager() {
                 />
               </div>
               <div>
-                <Label htmlFor="port">API Port (MikroTik API, no Winbox)</Label>
+                <Label htmlFor="auth-method">Método de Autenticación</Label>
+                <Select
+                  value={formData.auth_method}
+                  onValueChange={(value: 'api' | 'web' | 'winbox') =>
+                    setFormData({ ...formData, auth_method: value })
+                  }
+                >
+                  <SelectTrigger id="auth-method">
+                    <SelectValue placeholder="Seleccionar método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="api">API (Puerto 8728)</SelectItem>
+                    <SelectItem value="web">Web (Puerto 80)</SelectItem>
+                    <SelectItem value="winbox">Winbox (Puerto 8291)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  El puerto se ajustará automáticamente según el método
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="port">Puerto (Opcional - deja vacío para usar el predeterminado)</Label>
                 <Input
                   id="port"
                   value={formData.port}
                   onChange={(e) => setFormData({ ...formData, port: e.target.value })}
                   placeholder="8728"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Puerto API: 8728 (por defecto) - Diferente al puerto Winbox (8291)
-                </p>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="monitor-start">Hora Inicio Monitoreo</Label>
+                  <Input
+                    id="monitor-start"
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={formData.monitor_start_hour}
+                    onChange={(e) => setFormData({ ...formData, monitor_start_hour: e.target.value })}
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">0-23 horas</p>
+                </div>
+                <div>
+                  <Label htmlFor="monitor-end">Hora Fin Monitoreo</Label>
+                  <Input
+                    id="monitor-end"
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={formData.monitor_end_hour}
+                    onChange={(e) => setFormData({ ...formData, monitor_end_hour: e.target.value })}
+                    placeholder="24"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">0-24 horas</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                💡 Conexiones secuenciales (una por vez) para evitar problemas con RADIUS
+              </p>
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Adding...' : 'Add Node'}
               </Button>
@@ -289,17 +372,66 @@ export function NodeManager() {
                 />
               </div>
               <div>
-                <Label htmlFor="edit-port">API Port (MikroTik API, no Winbox)</Label>
+                <Label htmlFor="edit-auth-method">Método de Autenticación</Label>
+                <Select
+                  value={formData.auth_method}
+                  onValueChange={(value: 'api' | 'web' | 'winbox') =>
+                    setFormData({ ...formData, auth_method: value })
+                  }
+                >
+                  <SelectTrigger id="edit-auth-method">
+                    <SelectValue placeholder="Seleccionar método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="api">API (Puerto 8728)</SelectItem>
+                    <SelectItem value="web">Web (Puerto 80)</SelectItem>
+                    <SelectItem value="winbox">Winbox (Puerto 8291)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  El puerto se ajustará automáticamente según el método
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="edit-port">Puerto (Opcional - deja vacío para usar el predeterminado)</Label>
                 <Input
                   id="edit-port"
                   value={formData.port}
                   onChange={(e) => setFormData({ ...formData, port: e.target.value })}
                   placeholder="8728"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Puerto API: 8728 (por defecto) - Diferente al puerto Winbox (8291)
-                </p>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-monitor-start">Hora Inicio Monitoreo</Label>
+                  <Input
+                    id="edit-monitor-start"
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={formData.monitor_start_hour}
+                    onChange={(e) => setFormData({ ...formData, monitor_start_hour: e.target.value })}
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">0-23 horas</p>
+                </div>
+                <div>
+                  <Label htmlFor="edit-monitor-end">Hora Fin Monitoreo</Label>
+                  <Input
+                    id="edit-monitor-end"
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={formData.monitor_end_hour}
+                    onChange={(e) => setFormData({ ...formData, monitor_end_hour: e.target.value })}
+                    placeholder="24"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">0-24 horas</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                💡 Máximo 3 intentos de reconexión automática
+              </p>
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Updating...' : 'Update Node'}
               </Button>
