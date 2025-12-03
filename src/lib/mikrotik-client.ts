@@ -78,8 +78,7 @@ export class MikrotikMonitor {
     }
 
     try {
-      const logMenu = this.client.menu('/log');
-      const logs = await logMenu.getAll() as any[];
+      const logs = await this.client.write('/log/print') as any[];
 
       return logs.slice(0, limit).map(log => ({
         '.id': log['.id'] || '',
@@ -101,8 +100,7 @@ export class MikrotikMonitor {
     }
 
     try {
-      const logMenu = this.client.menu('/log');
-      const logs = await logMenu.getAll() as any[];
+      const logs = await this.client.write('/log/print') as any[];
 
       // Filter logs after last known ID
       let newLogs = logs;
@@ -140,8 +138,7 @@ export class MikrotikMonitor {
     }
 
     try {
-      const interfaceMenu = this.client.menu('/interface');
-      const interfaces = await interfaceMenu.getAll();
+      const interfaces = await this.client.write('/interface/print');
       return interfaces as any[];
     } catch (error) {
       console.error(`[MikroTik] Error getting interfaces from ${this.node.name}:`, error);
@@ -155,8 +152,7 @@ export class MikrotikMonitor {
     }
 
     try {
-      const resourceMenu = this.client.menu('/system/resource');
-      const resources = await resourceMenu.getAll() as any[];
+      const resources = await this.client.write('/system/resource/print') as any[];
       return resources[0];
     } catch (error) {
       console.error(`[MikroTik] Error getting system resources from ${this.node.name}:`, error);

@@ -200,7 +200,7 @@ export const alertOperations = {
     return result.lastInsertRowid;
   },
 
-  getActive: () => {
+  getActive: (): (Alert & { node_name: string })[] => {
     const stmt = db.prepare(`
       SELECT a.*, n.name as node_name
       FROM alerts a
@@ -208,16 +208,16 @@ export const alertOperations = {
       WHERE a.resolved = 0
       ORDER BY a.last_occurrence DESC
     `);
-    return stmt.all();
+    return stmt.all() as (Alert & { node_name: string })[];
   },
 
-  getByNodeId: (nodeId: number) => {
+  getByNodeId: (nodeId: number): Alert[] => {
     const stmt = db.prepare(`
       SELECT * FROM alerts
       WHERE node_id = ? AND resolved = 0
       ORDER BY last_occurrence DESC
     `);
-    return stmt.all(nodeId);
+    return stmt.all(nodeId) as Alert[];
   },
 
   increment: (id: number) => {
